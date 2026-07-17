@@ -16,7 +16,9 @@ fn dep_kind_parses_wire_names() {
         DepKind::Blocks
     );
     assert_eq!(
-        "relates".parse::<DepKind>().expect("relates is a valid kind"),
+        "relates"
+            .parse::<DepKind>()
+            .expect("relates is a valid kind"),
         DepKind::Relates
     );
 }
@@ -36,7 +38,9 @@ fn status_parses_wire_names_and_rejects_junk() {
         Status::InProgress
     );
     assert_eq!(
-        "closed".parse::<Status>().expect("closed is a valid status"),
+        "closed"
+            .parse::<Status>()
+            .expect("closed is a valid status"),
         Status::Closed
     );
     assert!("done".parse::<Status>().is_err());

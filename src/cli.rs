@@ -64,14 +64,16 @@ pub fn exit_code(err: &store::Error) -> u8 {
         store::Error::IssueIdAmbiguous { .. }
         | store::Error::IssueIdExists { .. }
         | store::Error::SelfDependency => 4,
-        store::Error::DatabaseBusy
-        | store::Error::Sqlite { .. }
-        | store::Error::Io { .. } => 1,
+        store::Error::DatabaseBusy | store::Error::Sqlite { .. } | store::Error::Io { .. } => 1,
     }
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "tix", version, about = "minimal issue tracker for humans and agents")]
+#[command(
+    name = "tix",
+    version,
+    about = "minimal issue tracker for humans and agents"
+)]
 pub struct Cli {
     /// Emit machine-readable JSON envelopes instead of human output.
     #[arg(long, global = true)]

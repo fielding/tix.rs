@@ -184,7 +184,10 @@ fn force_reimport_rebuilds_cache_from_jsonl() {
 
     s.store.force_reimport().expect("force reimport");
 
-    let issue = s.store.fetch_issue(id.as_str()).expect("fetch after reimport");
+    let issue = s
+        .store
+        .fetch_issue(id.as_str())
+        .expect("fetch after reimport");
     assert_eq!(issue.title, "Reimport test");
     assert_eq!(issue.tags, ["test-tag"]);
 }
@@ -207,9 +210,15 @@ fn force_reimport_preserves_comments() {
 
     s.store.force_reimport().expect("force reimport");
 
-    let issue = s.store.fetch_issue(id.as_str()).expect("fetch after reimport");
+    let issue = s
+        .store
+        .fetch_issue(id.as_str())
+        .expect("fetch after reimport");
     assert_eq!(issue.title, "Comment reimport");
-    let comments = s.store.comments(id.as_str()).expect("comments after reimport");
+    let comments = s
+        .store
+        .comments(id.as_str())
+        .expect("comments after reimport");
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].id, comment_id);
     assert_eq!(comments[0].body, "test comment");
@@ -239,8 +248,12 @@ fn force_reimport_preserves_dependencies() {
 
     s.store.force_reimport().expect("force reimport");
 
-    s.store.fetch_issue(id1.as_str()).expect("fetch A after reimport");
-    s.store.fetch_issue(id2.as_str()).expect("fetch B after reimport");
+    s.store
+        .fetch_issue(id1.as_str())
+        .expect("fetch A after reimport");
+    s.store
+        .fetch_issue(id2.as_str())
+        .expect("fetch B after reimport");
     let deps = s.store.deps(id1.as_str()).expect("deps after reimport");
     assert_eq!(deps.len(), 1);
 }
@@ -261,7 +274,10 @@ fn reimport_preserves_special_chars() {
 
     s.store.force_reimport().expect("force reimport");
 
-    let issue = s.store.fetch_issue(id.as_str()).expect("fetch after reimport");
+    let issue = s
+        .store
+        .fetch_issue(id.as_str())
+        .expect("fetch after reimport");
     assert_eq!(issue.title, "Title with \"quotes\"");
     assert_eq!(issue.body, "Body with\nnewlines\tand\ttabs");
     assert_eq!(issue.assignee, "user\\name");
@@ -282,7 +298,10 @@ fn reimport_preserves_tags() {
 
     s.store.force_reimport().expect("force reimport");
 
-    let issue = s.store.fetch_issue(id.as_str()).expect("fetch after reimport");
+    let issue = s
+        .store
+        .fetch_issue(id.as_str())
+        .expect("fetch after reimport");
     let mut tags = issue.tags.clone();
     tags.sort();
     assert_eq!(tags, ["alpha", "beta", "gamma"]);
@@ -370,8 +389,11 @@ fn opens_with_only_blank_lines() {
 #[test]
 fn opens_with_malformed_json_lines() {
     let dir = tempfile::tempdir().expect("create scratch dir");
-    fs::write(dir.path().join("issues.jsonl"), "not json at all\n{broken\n")
-        .expect("write jsonl");
+    fs::write(
+        dir.path().join("issues.jsonl"),
+        "not json at all\n{broken\n",
+    )
+    .expect("write jsonl");
     Store::open(dir.path()).expect("open store over malformed lines");
 }
 
@@ -435,8 +457,12 @@ fn reopen_imports_externally_appended_records() {
     drop(file);
 
     let store = Store::open(dir.path()).expect("reopen store");
-    store.fetch_issue(id.as_str()).expect("local issue survives");
-    let external = store.fetch_issue("ext-aaaaaa").expect("external issue imported");
+    store
+        .fetch_issue(id.as_str())
+        .expect("local issue survives");
+    let external = store
+        .fetch_issue("ext-aaaaaa")
+        .expect("external issue imported");
     assert_eq!(external.title, "External issue");
 }
 
@@ -469,7 +495,9 @@ fn reopen_after_jsonl_truncation_fully_reimports() {
     fs::write(&jsonl_path, format!("{first_line}\n")).expect("truncate jsonl");
 
     let store = Store::open(dir.path()).expect("reopen store");
-    store.fetch_issue(id1.as_str()).expect("first issue survives");
+    store
+        .fetch_issue(id1.as_str())
+        .expect("first issue survives");
     let result = store.fetch_issue(id2.as_str());
     assert!(
         matches!(result, Err(Error::IssueNotFound { .. })),

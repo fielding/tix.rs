@@ -70,7 +70,10 @@ fn resolve_ambiguous_prefix_errors() {
         .expect("create issue");
 
     // The shared store prefix (through the dash) matches both issues.
-    let dash = id1.as_str().find('-').expect("generated id contains a dash");
+    let dash = id1
+        .as_str()
+        .find('-')
+        .expect("generated id contains a dash");
     let shared = &id1.as_str()[..=dash];
     let result = s.store.resolve_id(shared);
     assert!(

@@ -109,7 +109,10 @@ fn priority_one_roundtrips() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         1
     );
 }
@@ -127,7 +130,10 @@ fn priority_five_roundtrips() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         5
     );
 }
@@ -145,7 +151,10 @@ fn priority_zero_roundtrips() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         0
     );
 }
@@ -163,7 +172,10 @@ fn negative_priority_roundtrips() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         -1
     );
 }
@@ -181,7 +193,10 @@ fn very_large_priority_roundtrips() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         99999
     );
 }
@@ -201,13 +216,19 @@ fn negative_priority_survives_reimport() {
         })
         .expect("create issue");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch issue").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch issue")
+            .priority,
         -5
     );
 
     s.store.force_reimport().expect("force reimport");
     assert_eq!(
-        s.store.fetch_issue(id.as_str()).expect("fetch after reimport").priority,
+        s.store
+            .fetch_issue(id.as_str())
+            .expect("fetch after reimport")
+            .priority,
         -5
     );
 }
@@ -411,7 +432,10 @@ fn status_walks_open_in_progress_closed() {
                 },
             )
             .expect("update status");
-        assert_eq!(s.store.fetch_issue(&id).expect("fetch issue").status, status);
+        assert_eq!(
+            s.store.fetch_issue(&id).expect("fetch issue").status,
+            status
+        );
     }
 }
 

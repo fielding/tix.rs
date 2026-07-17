@@ -136,7 +136,11 @@ impl Store {
     /// Apply a partial update, bump `updated_at` (preserving `created_at`),
     /// and append the resulting full snapshot to the JSONL log. Removing a
     /// tag the issue does not carry is a no-op. Returns the resolved id.
-    pub fn update_issue(&mut self, id_input: &str, update: &IssueUpdate<'_>) -> Result<IssueId, Error> {
+    pub fn update_issue(
+        &mut self,
+        id_input: &str,
+        update: &IssueUpdate<'_>,
+    ) -> Result<IssueId, Error> {
         todo!()
     }
 

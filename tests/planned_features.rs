@@ -26,7 +26,10 @@ fn create_with_caller_chosen_id() {
         .expect("create issue with chosen id");
     assert_eq!(id.as_str(), "boot-strap-1");
 
-    let issue = s.store.fetch_issue("boot-strap-1").expect("fetch by chosen id");
+    let issue = s
+        .store
+        .fetch_issue("boot-strap-1")
+        .expect("fetch by chosen id");
     assert_eq!(issue.id, id);
     assert_eq!(issue.title, "Bootstrap");
 }
@@ -206,7 +209,10 @@ fn export_import_round_trip_preserves_ids_and_state() {
 
     let mut dst = common::open_scratch();
     let applied = dst.store.import(&events).expect("import");
-    assert!(applied >= 4, "expected at least 4 records applied, got {applied}");
+    assert!(
+        applied >= 4,
+        "expected at least 4 records applied, got {applied}"
+    );
 
     let issue_a = dst.store.fetch_issue(a.as_str()).expect("A exists in dst");
     assert_eq!(issue_a.id, a);
@@ -288,7 +294,10 @@ fn delete_preserves_append_only_history() {
         log_after.starts_with(&log_before),
         "delete must append, not rewrite history"
     );
-    assert!(log_after.contains("Tombstoned"), "original snapshot preserved");
+    assert!(
+        log_after.contains("Tombstoned"),
+        "original snapshot preserved"
+    );
     assert!(
         log_after.contains("\"type\":\"delete\""),
         "tombstone record appended; log: {log_after}"
