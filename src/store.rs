@@ -28,6 +28,8 @@
 //! `issues.db*` is always safe.
 #![expect(unused_variables, reason = "todo!() stubs; remove once implemented")]
 
+mod log;
+
 use std::path::{Path, PathBuf};
 
 use crate::comment::Comment;
