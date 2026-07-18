@@ -68,6 +68,12 @@ Acceptance follows actual emissions, not hypothetical ones.
   free in principle, but the ported Zig tests pin any-`i32` store
   semantics; amending that spec is a separate decision, not a side effect.
 
+- **Cache upserts use `INSERT … ON CONFLICT DO UPDATE`, not the Zig
+  `INSERT OR REPLACE`**: REPLACE deletes-and-reinserts, churning the rowid
+  and orphaning FTS rows (invisible garbage in the Zig cache — the search
+  join filters it — but garbage still). Rowids stay stable here. Derived
+  state only; both binaries read either variant.
+
 ## Error model
 
 - Per-module errors per the family Rust conventions: `store::Error` with

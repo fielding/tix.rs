@@ -6,7 +6,6 @@
 //! one place per record (`into_*`), and a conversion failure means "skip this
 //! line" — the same self-healing tolerance the Zig reader had, and the seam
 //! that lets unknown future record types pass through harmlessly.
-#![expect(dead_code, reason = "consumed incrementally as Store methods land")]
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
