@@ -42,6 +42,32 @@ semantics exactly.
   only active edges. The Zig sqlite schema's `state` column is an
   implementation choice, not a contract.
 
+## Tightened invariants (2026-07-18, deviations from Zig looseness)
+
+Backed by an audit of all 32 real stores on this machine (3,024 records,
+2026-07-17): the Zig *code* tolerated far more than production ever *emitted*.
+Acceptance follows actual emissions, not hypothetical ones.
+
+- **`IssueId` is validated at construction**: ASCII `[A-Za-z0-9._-]`,
+  non-empty, alphanumeric at both ends; byte-exact with no case folding
+  (the Zig implementation was accidentally inconsistent — case-sensitive
+  exact match, case-insensitive LIKE fallback; resolution *queries* may
+  case-fold, ids themselves never do). Construction only via
+  `FromStr`/`TryFrom<String>` through one private validator. The charset
+  covers every dir-derived legacy prefix found in the audit (`tix.rs`,
+  `Nwallet`, `justfielding.com`); stores created under directory names
+  outside it (spaces, unicode) fail loudly — a deliberate, documented
+  compat break with zero known real instances.
+- **Status stays a strict closed enum.** The audit found exactly six
+  legacy records with `doing`/`done` (mon store, written by something that
+  bypassed the Zig CLI's validation). Repair is append-only: corrective
+  full snapshots with canonical statuses, history untouched — in a
+  snapshot-per-line log, migration is just mutation.
+- **Store-side priority tightening is deliberately deferred.** The audit
+  found zero out-of-range priorities in real stores, so tightening is
+  free in principle, but the ported Zig tests pin any-`i32` store
+  semantics; amending that spec is a separate decision, not a side effect.
+
 ## Error model
 
 - Per-module errors per the family Rust conventions: `store::Error` with

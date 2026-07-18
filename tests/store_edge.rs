@@ -5,7 +5,9 @@
 
 mod common;
 
-use tix::model::{DepKind, IssueUpdate, NewIssue, Status};
+use tix::dep_kind::DepKind;
+use tix::issue::{IssueUpdate, NewIssue};
+use tix::status::Status;
 
 fn create_titled(s: &mut common::Scratch, title: &str) -> String {
     s.store

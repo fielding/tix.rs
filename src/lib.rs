@@ -20,6 +20,13 @@
 //! See `DECISIONS.md` for every deliberate deviation from the Zig behavior.
 
 pub mod cli;
+pub mod comment;
+pub mod comment_id;
+pub mod dep;
+pub mod dep_kind;
+pub mod hold;
 pub mod ids;
-pub mod model;
+pub mod issue;
+pub mod issue_id;
+pub mod status;
 pub mod store;

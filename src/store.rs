@@ -30,9 +30,22 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::model::{
-    Comment, CommentId, Dep, DepKind, Hold, Issue, IssueId, IssueUpdate, ListFilter, NewIssue,
-};
+use crate::comment::Comment;
+use crate::comment_id::CommentId;
+use crate::dep::Dep;
+use crate::dep_kind::DepKind;
+use crate::hold::Hold;
+use crate::issue::{Issue, IssueUpdate, NewIssue};
+use crate::issue_id::IssueId;
+use crate::status::Status;
+
+/// Filters for [`Store::list`]; `None` matches everything.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ListFilter<'a> {
+    pub status: Option<Status>,
+    pub assignee: Option<&'a str>,
+    pub tag: Option<&'a str>,
+}
 
 /// Store-layer failures. Callers converting these for the CLI map them onto
 /// the folio-family exit codes and error envelope in [`crate::cli`].

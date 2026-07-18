@@ -10,7 +10,8 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write as _;
 
-use tix::model::{IssueUpdate, NewIssue, Status};
+use tix::issue::{IssueUpdate, NewIssue};
+use tix::status::Status;
 use tix::store::{Error, Store};
 
 // Zig: "createIssue writes to JSONL file"
@@ -73,7 +74,7 @@ fn add_dep_writes_record_to_jsonl() {
         })
         .expect("create issue");
     s.store
-        .add_dep(id1.as_str(), tix::model::DepKind::Blocks, id2.as_str())
+        .add_dep(id1.as_str(), tix::dep_kind::DepKind::Blocks, id2.as_str())
         .expect("add dep");
 
     let log = common::read_jsonl(&s.store);
@@ -100,10 +101,10 @@ fn remove_dep_appends_removed_record_to_jsonl() {
         })
         .expect("create issue");
     s.store
-        .add_dep(id1.as_str(), tix::model::DepKind::Blocks, id2.as_str())
+        .add_dep(id1.as_str(), tix::dep_kind::DepKind::Blocks, id2.as_str())
         .expect("add dep");
     s.store
-        .remove_dep(id1.as_str(), tix::model::DepKind::Blocks, id2.as_str())
+        .remove_dep(id1.as_str(), tix::dep_kind::DepKind::Blocks, id2.as_str())
         .expect("remove dep");
 
     let log = common::read_jsonl(&s.store);
@@ -243,7 +244,7 @@ fn force_reimport_preserves_dependencies() {
         })
         .expect("create issue");
     s.store
-        .add_dep(id1.as_str(), tix::model::DepKind::Blocks, id2.as_str())
+        .add_dep(id1.as_str(), tix::dep_kind::DepKind::Blocks, id2.as_str())
         .expect("add dep");
 
     s.store.force_reimport().expect("force reimport");

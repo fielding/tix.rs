@@ -7,7 +7,7 @@
 
 mod common;
 
-use tix::model::NewIssue;
+use tix::issue::NewIssue;
 
 // Zig: "FTS search finds issue by title"
 #[test]

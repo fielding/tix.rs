@@ -101,7 +101,7 @@ pub enum Command {
         #[arg(short, long, default_value = "")]
         body: String,
         /// 1 (highest) to 5 (lowest).
-        #[arg(short, long, default_value_t = crate::model::DEFAULT_PRIORITY,
+        #[arg(short, long, default_value_t = crate::issue::DEFAULT_PRIORITY,
               value_parser = clap::value_parser!(i32).range(1..=5))]
         priority: i32,
         #[arg(short, long, default_value = "")]

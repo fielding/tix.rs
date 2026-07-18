@@ -7,7 +7,8 @@ mod common;
 
 use std::fs;
 
-use tix::model::{Hold, HoldKind, NewIssue};
+use tix::hold::{Hold, HoldKind};
+use tix::issue::NewIssue;
 use tix::store::{Error, Store};
 
 // ─── add --id: caller-chosen ids ────────────────────────────────────────────
@@ -198,7 +199,7 @@ fn export_import_round_trip_preserves_ids_and_state() {
         })
         .expect("create B");
     src.store
-        .add_dep(a.as_str(), tix::model::DepKind::Blocks, b.as_str())
+        .add_dep(a.as_str(), tix::dep_kind::DepKind::Blocks, b.as_str())
         .expect("add dep");
     let comment = src
         .store
@@ -265,7 +266,7 @@ fn delete_hides_issue_everywhere() {
 
     let listed: Vec<_> = s
         .store
-        .list(&tix::model::ListFilter::default())
+        .list(&tix::store::ListFilter::default())
         .expect("list")
         .into_iter()
         .map(|i| i.id)

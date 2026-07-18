@@ -3,7 +3,8 @@
 
 mod common;
 
-use tix::model::{IssueUpdate, NewIssue, Status};
+use tix::issue::{IssueUpdate, NewIssue};
+use tix::status::Status;
 use tix::store::Error;
 
 // Zig: "createIssue returns ID with prefix"

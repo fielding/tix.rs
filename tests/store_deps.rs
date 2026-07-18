@@ -7,7 +7,8 @@
 
 mod common;
 
-use tix::model::{DepKind, NewIssue};
+use tix::dep_kind::DepKind;
+use tix::issue::NewIssue;
 use tix::store::Error;
 
 fn two_issues(s: &mut common::Scratch, a: &str, b: &str) -> (String, String) {

@@ -3,7 +3,7 @@
 
 mod common;
 
-use tix::model::NewIssue;
+use tix::issue::NewIssue;
 use tix::store::Error;
 
 // Zig: "resolveId exact match"
