@@ -79,3 +79,12 @@ fn ulid_generations_are_all_unique() {
     let ulids: HashSet<String> = (0..20_u64).map(|i| generator.next(5000 + i)).collect();
     assert_eq!(ulids.len(), 20);
 }
+
+// No Zig ancestor: golden values pin the exact FNV-1a algorithm and the
+// low-nibble-first rendering; shape tests alone pass on wrong algorithms.
+// Values computed with an independent Python implementation.
+#[test]
+fn short_hash_matches_golden_values() {
+    assert_eq!(short_hash(""), "523222");
+    assert_eq!(short_hash("hello world"), "7e2dc3");
+}
