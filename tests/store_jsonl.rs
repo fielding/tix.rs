@@ -529,3 +529,76 @@ fn concurrent_handles_retry_through_busy() {
         .expect("create via second handle");
     assert_ne!(id_a, id_b);
 }
+
+// No Zig ancestor — regression for a review finding: an external append that
+// lands BETWEEN two of our own writes must not be skipped. Stamping the
+// post-append file size as the offset would mark the interloper's bytes
+// consumed-without-import, and size == offset would suppress healing forever.
+#[test]
+fn external_append_between_own_writes_is_not_lost() {
+    let dir = common::scratch_dir();
+    {
+        let mut store = Store::open(dir.path()).expect("open store");
+        store
+            .create_issue(&NewIssue {
+                title: "Before interloper",
+                ..NewIssue::default()
+            })
+            .expect("create first issue");
+
+        // Another writer sneaks a record in while our handle is live.
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(dir.path().join("issues.jsonl"))
+            .expect("open jsonl for append");
+        writeln!(
+            file,
+            "{{\"type\":\"issue\",\"id\":\"ext-bbbbbb\",\"title\":\"Interloper\",\"body\":\"\",\"status\":\"open\",\"priority\":2,\"assignee\":\"\",\"created_at\":1000,\"updated_at\":1000,\"tags\":[]}}"
+        )
+        .expect("append external record");
+        drop(file);
+
+        // Our next write advances the offset past the interloper's bytes.
+        store
+            .create_issue(&NewIssue {
+                title: "After interloper",
+                ..NewIssue::default()
+            })
+            .expect("create second issue");
+    }
+
+    // A fresh open sees size == offset, so only what was actually imported
+    // is visible: the interloper must already be in the cache.
+    let store = Store::open(dir.path()).expect("reopen store");
+    let external = store
+        .fetch_issue("ext-bbbbbb")
+        .expect("interleaved external record must be imported, not skipped");
+    assert_eq!(external.title, "Interloper");
+}
+
+// No Zig ancestor — spec deviation (DECISIONS.md): a deleted issues.jsonl is
+// an empty log, not a no-op. The Zig reader keeps ghost cache rows; here the
+// cache is wiped so it never asserts issues that exist nowhere.
+#[test]
+fn deleted_jsonl_empties_the_cache_instead_of_keeping_ghosts() {
+    let dir = common::scratch_dir();
+    let id;
+    {
+        let mut store = Store::open(dir.path()).expect("open store");
+        id = store
+            .create_issue(&NewIssue {
+                title: "Doomed with its log",
+                ..NewIssue::default()
+            })
+            .expect("create issue");
+    }
+
+    fs::remove_file(dir.path().join("issues.jsonl")).expect("delete jsonl");
+
+    let store = Store::open(dir.path()).expect("reopen store");
+    let result = store.fetch_issue(id.as_str());
+    assert!(
+        matches!(result, Err(Error::IssueNotFound { .. })),
+        "ghost issue must not survive its log, got {result:?}"
+    );
+}

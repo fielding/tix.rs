@@ -202,9 +202,13 @@ impl Store {
     /// Bring the cache up to date with the log: import new bytes past the
     /// stored high-water mark, or rebuild from zero when the file shrank.
     fn self_heal(&mut self) -> Result<(), Error> {
+        // A missing log is an empty log (size 0), not a no-op: with a stored
+        // offset > 0 it is a shrink, and the stale cache would otherwise keep
+        // asserting issues that no longer exist anywhere. (Deviation from the
+        // Zig reader, which returns early and keeps the ghosts; DECISIONS.md.)
         let size = match std::fs::metadata(&self.jsonl_path) {
             Ok(meta) => meta.len(),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => 0,
             Err(err) => return Err(map_io(err)),
         };
         let offset = self.cache.jsonl_offset().map_err(map_sqlite)?;
@@ -224,16 +228,24 @@ impl Store {
         for (record, _end) in log::read_from(&self.jsonl_path, offset).map_err(map_io)? {
             self.cache.apply(record).map_err(map_sqlite)?;
         }
-        let size = std::fs::metadata(&self.jsonl_path).map_err(map_io)?.len();
+        let size = match std::fs::metadata(&self.jsonl_path) {
+            Ok(meta) => meta.len(),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(err) => return Err(map_io(err)),
+        };
         self.cache.set_jsonl_offset(size).map_err(map_sqlite)
     }
 
-    /// Append a record to the log and advance the cache high-water mark, so
-    /// our own writes are not re-imported on the next open.
+    /// Append a record to the log, then import everything past the previous
+    /// high-water mark. Stamping the post-append file size directly would
+    /// mark any bytes a concurrent writer slipped in as consumed-but-never-
+    /// imported — permanently invisible, since `size == offset` suppresses
+    /// all future healing. Importing from the old offset sweeps up our own
+    /// record (idempotent upsert) and any interloper's alike.
     fn append_record(&mut self, record: &log::Record) -> Result<(), Error> {
+        let offset = self.cache.jsonl_offset().map_err(map_sqlite)?;
         log::append(&self.jsonl_path, record).map_err(map_io)?;
-        let size = std::fs::metadata(&self.jsonl_path).map_err(map_io)?.len();
-        self.cache.set_jsonl_offset(size).map_err(map_sqlite)
+        self.import_from(offset)
     }
 
     /// The id prefix used for generated issue ids.

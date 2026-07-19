@@ -166,3 +166,14 @@ Known convention exception while the suite is red: `cli::execute` is a
 `todo!()` on a user-reachable path, which the family Rust conventions
 forbid for shipped binaries. Intentional here — the binary is not shipped
 until the captain implements it; the panic *is* the red suite.
+
+## Post-implementation review fixes (2026-07-18)
+
+- **Append advances the offset by importing, never by stamping file size.**
+  Stamping the post-append size marked any concurrently-appended bytes as
+  consumed-without-import — permanently invisible, since `size == offset`
+  suppresses healing. Found in owner review; regression-tested.
+- **A deleted `issues.jsonl` is an empty log (size 0), not a no-op.** The Zig
+  reader returns early and keeps stale cache rows asserting issues that exist
+  nowhere; here offset > 0 with a missing file is treated as a shrink and the
+  cache is wiped. Deviation from Zig, regression-tested.
