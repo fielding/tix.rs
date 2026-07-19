@@ -223,7 +223,427 @@ pub fn run() -> ExitCode {
     execute(&cli)
 }
 
-#[expect(unused_variables, reason = "todo!() stub; remove once implemented")]
+/// A command failure, unified across the store and the parse boundary.
+enum Failure {
+    Store(store::Error),
+    /// CLI-level parse rejection (bad status/kind names): exit 5.
+    Validation(String),
+    /// Planned feature whose store support has not landed yet: exit 1.
+    NotImplemented(&'static str),
+}
+
+impl From<store::Error> for Failure {
+    fn from(err: store::Error) -> Self {
+        Failure::Store(err)
+    }
+}
+
+impl Failure {
+    fn code(&self) -> &'static str {
+        match self {
+            Failure::Store(err) => error_code(err),
+            Failure::Validation(_) => "validation_failure",
+            Failure::NotImplemented(_) => "not_implemented",
+        }
+    }
+
+    fn exit(&self) -> u8 {
+        match self {
+            Failure::Store(err) => exit_code(err),
+            Failure::Validation(_) => 5,
+            Failure::NotImplemented(_) => 1,
+        }
+    }
+
+    fn message(&self) -> String {
+        match self {
+            Failure::Store(err) => err.to_string(),
+            Failure::Validation(message) => message.clone(),
+            Failure::NotImplemented(verb) => {
+                format!("{verb} is a planned feature and not implemented yet")
+            }
+        }
+    }
+}
+
+/// Issue DTO for `--json` output; the external contract, not the domain type.
+#[derive(Debug, Serialize)]
+struct IssueDto {
+    id: String,
+    title: String,
+    body: String,
+    status: &'static str,
+    priority: i32,
+    assignee: String,
+    created_at: i64,
+    updated_at: i64,
+    tags: Vec<String>,
+}
+
+impl IssueDto {
+    fn from_issue(issue: &crate::issue::Issue) -> Self {
+        Self {
+            id: issue.id.to_string(),
+            title: issue.title.clone(),
+            body: issue.body.clone(),
+            status: issue.status.as_str(),
+            priority: issue.priority,
+            assignee: issue.assignee.clone(),
+            created_at: issue.created_at,
+            updated_at: issue.updated_at,
+            tags: issue.tags.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct CommentDto {
+    id: String,
+    issue_id: String,
+    author: String,
+    body: String,
+    created_at: i64,
+}
+
+impl CommentDto {
+    fn from_comment(comment: &crate::comment::Comment) -> Self {
+        Self {
+            id: comment.id.to_string(),
+            issue_id: comment.issue_id.to_string(),
+            author: comment.author.clone(),
+            body: comment.body.clone(),
+            created_at: comment.created_at,
+        }
+    }
+}
+
+fn emit_json<T: Serialize>(data: T) {
+    let envelope = Envelope {
+        schema_version: SCHEMA_VERSION,
+        data,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&envelope).expect("envelope DTOs always serialize")
+    );
+}
+
+fn print_issue_row(issue: &crate::issue::Issue) {
+    println!(
+        "{:<16} {:<11} {:<3} {:<12} {}",
+        issue.id,
+        issue.status.as_str(),
+        format!("p{}", issue.priority),
+        if issue.assignee.is_empty() {
+            "-"
+        } else {
+            &issue.assignee
+        },
+        issue.title
+    );
+}
+
+fn print_issue_table(issues: &[crate::issue::Issue]) {
+    println!(
+        "{:<16} {:<11} {:<3} {:<12} TITLE",
+        "ID", "STATUS", "PRI", "ASSIGNEE"
+    );
+    for issue in issues {
+        print_issue_row(issue);
+    }
+}
+
+fn parse_status(input: &str) -> Result<crate::status::Status, Failure> {
+    input
+        .parse()
+        .map_err(|err: crate::status::ParseStatusError| Failure::Validation(err.to_string()))
+}
+
+fn parse_dep_kind(input: &str) -> Result<crate::dep_kind::DepKind, Failure> {
+    input
+        .parse()
+        .map_err(|err: crate::dep_kind::ParseDepKindError| Failure::Validation(err.to_string()))
+}
+
+fn open_store() -> Result<store::Store, Failure> {
+    let cwd = std::env::current_dir().map_err(|source| store::Error::Io { source })?;
+    let env = std::env::var("TIX_STORE").ok();
+    let dir = store::discover(&cwd, env.as_deref())?;
+    Ok(store::Store::open(&dir)?)
+}
+
 fn execute(cli: &Cli) -> ExitCode {
-    todo!()
+    match dispatch(cli) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(failure) => {
+            if cli.json {
+                let envelope = ErrorEnvelope {
+                    schema_version: SCHEMA_VERSION,
+                    error: ErrorBody {
+                        code: failure.code().to_owned(),
+                        message: failure.message(),
+                    },
+                };
+                println!(
+                    "{}",
+                    serde_json::to_string(&envelope).expect("envelope DTOs always serialize")
+                );
+            } else {
+                eprintln!("tix: {}", failure.message());
+                if let Failure::Store(err) = &failure {
+                    let mut source = std::error::Error::source(err);
+                    while let Some(cause) = source {
+                        eprintln!("  caused by: {cause}");
+                        source = cause.source();
+                    }
+                }
+            }
+            ExitCode::from(failure.exit())
+        }
+    }
+}
+
+fn dispatch(cli: &Cli) -> Result<(), Failure> {
+    match &cli.command {
+        Command::Init { prefix } => {
+            let store_dir = std::env::current_dir()
+                .map_err(|source| store::Error::Io { source })?
+                .join(".tix");
+            std::fs::create_dir_all(&store_dir).map_err(|source| store::Error::Io { source })?;
+            // Only the JSONL is history; the derived cache stays untracked.
+            std::fs::write(store_dir.join(".gitignore"), "*.db\n*.db-wal\n*.db-shm\n")
+                .map_err(|source| store::Error::Io { source })?;
+            let mut store = store::Store::open(&store_dir)?;
+            if let Some(prefix) = prefix {
+                store.set_prefix(prefix)?;
+            }
+            if cli.json {
+                emit_json(serde_json::json!({
+                    "store": store_dir.display().to_string(),
+                    "prefix": store.prefix(),
+                }));
+            } else {
+                println!(
+                    "initialized {} (prefix: {})",
+                    store_dir.display(),
+                    store.prefix()
+                );
+            }
+            Ok(())
+        }
+        Command::Add {
+            title,
+            body,
+            priority,
+            assignee,
+            tags,
+            id,
+            quiet: _,
+        } => {
+            let mut store = open_store()?;
+            let tag_refs: Vec<&str> = tags.iter().map(String::as_str).collect();
+            let created = store.create_issue(&crate::issue::NewIssue {
+                id: id.as_deref(),
+                title,
+                body,
+                priority: *priority,
+                assignee,
+                tags: &tag_refs,
+            })?;
+            if cli.json {
+                emit_json(IssueDto::from_issue(&store.fetch_issue(created.as_str())?));
+            } else {
+                println!("{created}");
+            }
+            Ok(())
+        }
+        Command::List {
+            status,
+            assignee,
+            tag,
+        } => {
+            let store = open_store()?;
+            let status = status.as_deref().map(parse_status).transpose()?;
+            let issues = store.list(&store::ListFilter {
+                status,
+                assignee: assignee.as_deref(),
+                tag: tag.as_deref(),
+            })?;
+            if cli.json {
+                emit_json(issues.iter().map(IssueDto::from_issue).collect::<Vec<_>>());
+            } else {
+                print_issue_table(&issues);
+            }
+            Ok(())
+        }
+        Command::Show { id } => {
+            let store = open_store()?;
+            let issue = store.fetch_issue(id)?;
+            let comments = store.comments(id)?;
+            if cli.json {
+                emit_json(serde_json::json!({
+                    "issue": IssueDto::from_issue(&issue),
+                    "comments": comments.iter().map(CommentDto::from_comment).collect::<Vec<_>>(),
+                }));
+            } else {
+                println!("ID: {}", issue.id);
+                println!("Title: {}", issue.title);
+                println!("Status: {}", issue.status);
+                println!("Priority: {}", issue.priority);
+                println!(
+                    "Assignee: {}",
+                    if issue.assignee.is_empty() {
+                        "-"
+                    } else {
+                        &issue.assignee
+                    }
+                );
+                println!("Created: {}", issue.created_at);
+                println!("Updated: {}", issue.updated_at);
+                if !issue.tags.is_empty() {
+                    println!("Tags: {}", issue.tags.join(", "));
+                }
+                if !issue.body.is_empty() {
+                    println!("\n{}", issue.body);
+                }
+                if !comments.is_empty() {
+                    println!("\nComments:");
+                    for comment in &comments {
+                        let author = if comment.author.is_empty() {
+                            "anonymous"
+                        } else {
+                            &comment.author
+                        };
+                        println!("  [{}] {}: {}", comment.created_at, author, comment.body);
+                    }
+                }
+            }
+            Ok(())
+        }
+        Command::Edit {
+            id,
+            title,
+            body,
+            status,
+            priority,
+            assignee,
+            add_tags,
+            rm_tags,
+            quiet: _,
+        } => {
+            let mut store = open_store()?;
+            let status = status.as_deref().map(parse_status).transpose()?;
+            let add: Vec<&str> = add_tags.iter().map(String::as_str).collect();
+            let rm: Vec<&str> = rm_tags.iter().map(String::as_str).collect();
+            let updated = store.update_issue(
+                id,
+                &crate::issue::IssueUpdate {
+                    title: title.as_deref(),
+                    body: body.as_deref(),
+                    status,
+                    priority: *priority,
+                    assignee: assignee.as_deref(),
+                    add_tags: &add,
+                    rm_tags: &rm,
+                },
+            )?;
+            if cli.json {
+                emit_json(IssueDto::from_issue(&store.fetch_issue(updated.as_str())?));
+            } else {
+                println!("{updated}");
+            }
+            Ok(())
+        }
+        Command::Status { id, status } => {
+            let mut store = open_store()?;
+            let status = parse_status(status)?;
+            let updated = store.update_issue(
+                id,
+                &crate::issue::IssueUpdate {
+                    status: Some(status),
+                    ..crate::issue::IssueUpdate::default()
+                },
+            )?;
+            if cli.json {
+                emit_json(IssueDto::from_issue(&store.fetch_issue(updated.as_str())?));
+            } else {
+                println!("{updated}");
+            }
+            Ok(())
+        }
+        Command::Assign { id, assignee } => {
+            let mut store = open_store()?;
+            let updated = store.update_issue(
+                id,
+                &crate::issue::IssueUpdate {
+                    assignee: Some(assignee),
+                    ..crate::issue::IssueUpdate::default()
+                },
+            )?;
+            if cli.json {
+                emit_json(IssueDto::from_issue(&store.fetch_issue(updated.as_str())?));
+            } else {
+                println!("{updated}");
+            }
+            Ok(())
+        }
+        Command::Comment {
+            id,
+            message,
+            author,
+            quiet: _,
+        } => {
+            let mut store = open_store()?;
+            let comment_id = store.add_comment(id, author, message)?;
+            if cli.json {
+                emit_json(serde_json::json!({ "comment_id": comment_id.to_string() }));
+            } else {
+                println!("{comment_id}");
+            }
+            Ok(())
+        }
+        Command::Dep { action } => {
+            let mut store = open_store()?;
+            match action {
+                DepAction::Add { id, kind, target } => {
+                    let kind = parse_dep_kind(kind)?;
+                    store.add_dep(id, kind, target)?;
+                }
+                DepAction::Rm { id, kind, target } => {
+                    let kind = parse_dep_kind(kind)?;
+                    store.remove_dep(id, kind, target)?;
+                }
+            }
+            if cli.json {
+                emit_json(serde_json::json!({ "ok": true }));
+            }
+            Ok(())
+        }
+        Command::Ready { assignee } => {
+            let store = open_store()?;
+            let issues = store.ready(assignee.as_deref())?;
+            if cli.json {
+                emit_json(issues.iter().map(IssueDto::from_issue).collect::<Vec<_>>());
+            } else {
+                print_issue_table(&issues);
+            }
+            Ok(())
+        }
+        Command::Search { query } => {
+            let store = open_store()?;
+            let issues = store.search(query)?;
+            if cli.json {
+                emit_json(issues.iter().map(IssueDto::from_issue).collect::<Vec<_>>());
+            } else {
+                print_issue_table(&issues);
+            }
+            Ok(())
+        }
+        Command::Hold { .. } => Err(Failure::NotImplemented("hold")),
+        Command::Unhold { .. } => Err(Failure::NotImplemented("unhold")),
+        Command::Rm { .. } => Err(Failure::NotImplemented("rm")),
+        Command::Export => Err(Failure::NotImplemented("export")),
+        Command::Import => Err(Failure::NotImplemented("import")),
+        Command::Dump => Err(Failure::NotImplemented("dump")),
+    }
 }
